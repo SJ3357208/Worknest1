@@ -148,7 +148,7 @@ const LoginPage: React.FC = () => {
                             <div className="w-full border-t border-gray-300"></div>
                         </div>
                         <div className="relative bg-white px-4 text-sm text-gray-500">
-                            {t('   ')} {/* You might need a translation key for 'Or' */}
+                            {t('orSeparator')} {/* You might need a translation key for 'Or' */}
                         </div>
                     </div>
                     
