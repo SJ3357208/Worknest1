@@ -3,7 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext'; // Ensure this path is correct
 import { Button, Input, Card } from '../components/ui'; // Ensure these paths are correct
 import { useTranslation } from '../hooks/useTranslation'; // Ensure this path is correct
-import { ExclamationTriangleIcon } from '../components/icons'; // Ensure this path is correct
+import { ExclamationTriangleIcon } from '../components/icons'; // Adjust path if you put it elsewhere // Ensure this path is correct
+
 
 const LoginPage: React.FC = () => {
     const { t } = useTranslation();
@@ -147,19 +148,21 @@ const LoginPage: React.FC = () => {
                             <div className="w-full border-t border-gray-300"></div>
                         </div>
                         <div className="relative bg-white px-4 text-sm text-gray-500">
-                            {t('orSeparator')} {/* You might need a translation key for 'Or' */}
+                            {t('   ')} {/* You might need a translation key for 'Or' */}
                         </div>
                     </div>
+                    
+                    
                     <Button
                         onClick={handleGoogleLogin}
                         variant="secondary" // Assuming you have a secondary variant for buttons, adjust as needed
                         size="lg"
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center space-x-2" // Tailwind for Google style
+                        className="w-full bg-white text-black border border-gray-300 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center space-x-3 shadow-sm" // Tailwind for Google style
                         disabled={isSubmitting || authLoading}
                     >
                         {isSubmitting ? (
                             <span className="flex items-center justify-center">
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -167,11 +170,13 @@ const LoginPage: React.FC = () => {
                             </span>
                         ) : (
                             <>
-                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M21.724 10.158c-.146-1.077-.962-1.928-2.094-2.528V7.5H20c.532 0 1.054.1 1.554.298l-.05.01zm-3.834 5.922c-.655.42-1.42.748-2.26.974l.024.092c-.378 1.455-1.558 2.5-2.924 2.5s-2.546-1.045-2.924-2.5l.024-.092c-.84-.226-1.605-.554-2.26-.974l-.06-.038c-.76-.484-1.39-1.09-1.876-1.782L3.1 13.98l.004-.002c-1.314-2.183-1.01-4.908.79-6.685l.006.006.002.002c.486-.448.97-.842 1.458-1.2l.06-.04c.8-.574 1.7-.992 2.62-1.258l-.014-.078c.37-1.42 1.51-2.458 2.846-2.458 1.334 0 2.476 1.038 2.846 2.458l-.014.078c.92.266 1.82.684 2.62 1.258l.06.04c.488.358.972.752 1.458 1.2l.006.006.002.002c1.8 1.777 2.104 4.502.79 6.685l-.004.002-.002-.004z"></path></svg>
-                                {t('loginFormButtonGoogle')}
+                                {/* Corrected: Use the GoogleIcon component */}
+                                <img src="/assets/google-logo.svg" alt="Google logo" className="h-5 w-5" />
+                                <span>{t('Log in with Google')}</span>
                             </>
                         )}
                     </Button>
+
                 </Card>
                 <p className="mt-4 text-center text-sm text-gray-600">
                     {t('loginFormLinkToRegister')}{' '}
