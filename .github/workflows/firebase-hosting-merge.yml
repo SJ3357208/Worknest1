@@ -5,16 +5,32 @@ name: Deploy to Firebase Hosting on merge
 on:
   push:
     branches:
-      - master
+      - master # IMPORTANT: Confirm if your main branch is 'master' or 'main'. Adjust if needed.
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm run build
+
+      # Step 1: Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Match this with the 'node' version in your package.json's 'engines' field
+
+      # Step 2: Install project dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Step 3: Run the build command
+      - name: Run npm run build
+        run: npm run build # This command now expects dependencies to be installed
+
+      # Step 4: Deploy to Firebase Hosting
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WORKNEST_B8E91 }}
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_WORKNEST_B8E91 }}'
           channelId: live
           projectId: worknest-b8e91
