@@ -1,123 +1,122 @@
+// src/context/AuthContext.tsx
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import {
+    User,
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup,
+    AuthError, // Import AuthError for type checking
+} from 'firebase/auth';
+import { auth } from '../firebase'; // Import your initialized auth instance
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { User } from '../types'; // Adjust path if needed
-
+// Define the type for the Auth Context value
 interface AuthContextType {
-  currentUser: User | null;
-  isLoading: boolean;
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
-  register: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+    currentUser: User | null;
+    loading: boolean;
+    signup: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
+    loginWithGoogle: () => Promise<void>;
+    logout: () => Promise<void>;
+    error: string | null;
 }
 
+// Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Simplified mock password storage - NOT FOR PRODUCTION
-const WORKNEST_USERS_KEY = 'worknest_users';
-const WORKNEST_CURRENT_USER_KEY = 'worknest_current_user';
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start as true until initial check is done
-
-  useEffect(() => {
-    // Check for logged-in user in localStorage on initial load
-    try {
-      const storedUserJson = localStorage.getItem(WORKNEST_CURRENT_USER_KEY);
-      if (storedUserJson) {
-        const user = JSON.parse(storedUserJson) as User;
-        // Basic validation if user object is as expected
-        if (user && user.email) {
-            setCurrentUser(user);
-        } else {
-            localStorage.removeItem(WORKNEST_CURRENT_USER_KEY); // Clear invalid data
-        }
-      }
-    } catch (error) {
-      console.error("Error loading current user from localStorage:", error);
-      localStorage.removeItem(WORKNEST_CURRENT_USER_KEY); // Clear potentially corrupted data
+// Custom hook to use the Auth Context
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
     }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500)); 
-
-    try {
-        const usersJson = localStorage.getItem(WORKNEST_USERS_KEY);
-        const users = usersJson ? JSON.parse(usersJson) : [];
-        const lowercasedEmail = email.toLowerCase();
-        const userRecord = users.find((u: { email: string, passHash: string}) => u.email.toLowerCase() === lowercasedEmail);
-
-        // In a real app, 'pass' would be hashed and compared with a stored hash.
-        // Here, we're doing a direct (and insecure) comparison for mock purposes.
-        if (userRecord && userRecord.passHash === pass) { // Mock "passHash" is just the plain password
-            const userToSet: User = { email: userRecord.email };
-            setCurrentUser(userToSet);
-            localStorage.setItem(WORKNEST_CURRENT_USER_KEY, JSON.stringify(userToSet));
-            setIsLoading(false);
-            return { success: true };
-        } else {
-            setIsLoading(false);
-            return { success: false, error: 'loginErrorInvalid' }; // Translation key for error
-        }
-    } catch (error) {
-        console.error("Login error:", error);
-        setIsLoading(false);
-        return { success: false, error: 'An unexpected error occurred.' }; // Generic error
-    }
-  };
-
-  const register = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    try {
-        let usersJson = localStorage.getItem(WORKNEST_USERS_KEY);
-        let users = usersJson ? JSON.parse(usersJson) : [];
-        const lowercasedEmail = email.toLowerCase();
-
-        if (users.find((u: {email: string}) => u.email.toLowerCase() === lowercasedEmail)) {
-            setIsLoading(false);
-            return { success: false, error: 'registerErrorEmailExists' }; // Translation key
-        }
-
-        // In a real app, hash the password here. We're storing it as is (insecurely).
-        users.push({ email: lowercasedEmail, passHash: pass }); // Storing plain pass as "passHash" for mock
-        localStorage.setItem(WORKNEST_USERS_KEY, JSON.stringify(users));
-
-        // Auto-login after registration
-        const userToSet: User = { email: lowercasedEmail };
-        setCurrentUser(userToSet);
-        localStorage.setItem(WORKNEST_CURRENT_USER_KEY, JSON.stringify(userToSet));
-        
-        setIsLoading(false);
-        return { success: true };
-    } catch (error) {
-        console.error("Registration error:", error);
-        setIsLoading(false);
-        return { success: false, error: 'An unexpected error occurred during registration.' };
-    }
-  };
-
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem(WORKNEST_CURRENT_USER_KEY);
-    // Optionally, navigate to home or login page after logout via useNavigate in component
-  };
-
-  return (
-    <AuthContext.Provider value={{ currentUser, isLoading, login, logout, register }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    return context;
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+// Auth Provider Component
+interface AuthProviderProps {
+    children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true); // Set to true initially
+    const [error, setError] = useState<string | null>(null);
+
+    // Listen for authentication state changes
+    useEffect(() => {
+        // onAuthStateChanged returns an unsubscribe function
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setCurrentUser(user);
+            setLoading(false); // Once the initial auth state is determined, set loading to false
+        });
+        return unsubscribe; // Clean up the listener when the component unmounts
+    }, []); // Empty dependency array means this effect runs once on mount
+
+    // --- Authentication Functions ---
+
+    const signup = async (email: string, password: string) => {
+        setError(null); // Clear previous errors
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+        } catch (err: any) { // Catch the error to set it in state
+            console.error("Signup error:", err.code, err.message);
+            setError(err.message || "Failed to create an account.");
+            throw err; // Re-throw to allow components to handle specific UI updates
+        }
+    };
+
+    const login = async (email: string, password: string) => {
+        setError(null); // Clear previous errors
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (err: any) {
+            console.error("Login error:", err.code, err.message);
+            setError(err.message || "Failed to log in.");
+            throw err;
+        }
+    };
+
+    const loginWithGoogle = async () => {
+        setError(null); // Clear previous errors
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (err: any) {
+            console.error("Google login error:", err.code, err.message);
+            setError(err.message || "Failed to sign in with Google.");
+            throw err;
+        }
+    };
+
+    const logout = async () => {
+        setError(null); // Clear previous errors
+        try {
+            await signOut(auth);
+        } catch (err: any) {
+            console.error("Logout error:", err.code, err.message);
+            setError(err.message || "Failed to log out.");
+            throw err;
+        }
+    };
+
+    // The value provided to the context consumers
+    const value = {
+        currentUser,
+        loading,
+        signup,
+        login,
+        loginWithGoogle,
+        logout,
+        error,
+    };
+
+    // Render children only after the initial authentication state has been determined
+    return (
+        <AuthContext.Provider value={value}>
+            {!loading && children}
+        </AuthContext.Provider>
+    );
 };
