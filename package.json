@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "engines": {
-    "node": "20" // Use Node.js 20. If still issues, try "18".
+    "node": "20" 
   },
   "dependencies": {
     "firebase": "^12.0.0",
