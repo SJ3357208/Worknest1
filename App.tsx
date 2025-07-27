@@ -15,7 +15,7 @@ import { useTranslation } from './hooks/useTranslation';
 import { LanguageCode } from './translations';
 
 // Import Firestore functions and the 'db' instance
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Added Timestamp import
 import { db } from './firebase'; // Import the initialized Firestore instance
 
 // Import page components
@@ -259,7 +259,8 @@ const AppContent: React.FC = () => {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const jobsData: Job[] = snapshot.docs.map(doc => ({
                 id: doc.id, // Firestore document ID
-                postedDate: doc.data().postedDate, // Ensure this is a string in YYYY-MM-DD format in Firestore
+                // Convert Firestore Timestamp to string for consistent type if needed later, or use Timestamp directly
+                postedDate: (doc.data().postedDate instanceof Timestamp) ? doc.data().postedDate.toDate().toISOString().split('T')[0] : doc.data().postedDate,
                 userEmail: doc.data().userEmail,
                 ...doc.data()
             } as Job)); // Cast to Job type
@@ -279,7 +280,8 @@ const AppContent: React.FC = () => {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const homesData: Home[] = snapshot.docs.map(doc => ({
                 id: doc.id, // Firestore document ID
-                postedDate: doc.data().postedDate, // Ensure this is a string in YYYY-MM-DD format in Firestore
+                // Convert Firestore Timestamp to string for consistent type if needed later, or use Timestamp directly
+                postedDate: (doc.data().postedDate instanceof Timestamp) ? doc.data().postedDate.toDate().toISOString().split('T')[0] : doc.data().postedDate,
                 userEmail: doc.data().userEmail,
                 ...doc.data()
             } as Home)); // Cast to Home type
@@ -303,7 +305,7 @@ const AppContent: React.FC = () => {
         try {
             const jobToAdd = {
                 ...newJob,
-                postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+                postedDate: serverTimestamp(), // Use Firestore serverTimestamp()
                 userEmail: currentUser.email,
                 userId: currentUser.uid, // Store user UID for security rules and ownership checks
             };
@@ -322,7 +324,7 @@ const AppContent: React.FC = () => {
         try {
             const homeToAdd = {
                 ...newHome,
-                postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+                postedDate: serverTimestamp(), // Use Firestore serverTimestamp()
                 userEmail: currentUser.email,
                 userId: currentUser.uid, // Store user UID for security rules and ownership checks
             };
