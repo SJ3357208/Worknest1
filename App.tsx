@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -248,25 +249,37 @@ const Footer: React.FC = () => {
 const AppContent: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
     const [homes, setHomes] = useState<Home[]>(MOCK_HOMES);
-    const { isLoading: authLoading } = useAuth();
+    const { currentUser, isLoading: authLoading } = useAuth();
 
 
-    const addJob = (newJob: Omit<Job, 'id' | 'postedDate'>) => {
+    const addJob = (newJob: Omit<Job, 'id' | 'postedDate' | 'userEmail'>) => {
+        if (!currentUser) return; // Should be protected by ProtectedRoute, but good practice
         const jobWithDetails: Job = {
             ...newJob,
             id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             postedDate: new Date().toISOString().split('T')[0],
+            userEmail: currentUser.email,
         };
         setJobs(prevJobs => [jobWithDetails, ...prevJobs]);
     };
 
-    const addHome = (newHome: Omit<Home, 'id' | 'postedDate'>) => {
+    const addHome = (newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => {
+        if (!currentUser) return;
         const homeWithDetails: Home = {
             ...newHome,
             id: `home-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             postedDate: new Date().toISOString().split('T')[0],
+            userEmail: currentUser.email,
         };
         setHomes(prevHomes => [homeWithDetails, ...prevHomes]);
+    };
+
+    const deleteJob = (jobId: string) => {
+        setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+    };
+
+    const deleteHome = (homeId: string) => {
+        setHomes(prevHomes => prevHomes.filter(home => home.id !== homeId));
     };
 
     const LocationWatcher = () => {
@@ -297,9 +310,9 @@ const AppContent: React.FC = () => {
                 <Routes>
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/jobs" element={<JobSearchPage jobs={jobs} />} />
-                    <Route path="/jobs/:id" element={<JobDetailsPage jobs={jobs} />} />
+                    <Route path="/jobs/:id" element={<JobDetailsPage jobs={jobs} deleteJob={deleteJob} />} />
                     <Route path="/homes" element={<HomeSearchPage homes={homes} />} />
-                    <Route path="/homes/:id" element={<HomeDetailsPage homes={homes} />} />
+                    <Route path="/homes/:id" element={<HomeDetailsPage homes={homes} deleteHome={deleteHome} />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
 
