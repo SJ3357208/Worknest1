@@ -10,33 +10,40 @@ import {
     POST_BATHROOM_OPTIONS
 } from '../constants';
 import { useTranslation } from '../hooks/useTranslation';
-import { CloudArrowUpIcon, XCircleIcon, ExclamationTriangleIcon } from '../components/icons'; // Assuming this path for icons
+import { CloudArrowUpIcon, XCircleIcon, ExclamationTriangleIcon } from '../components/icons';
+import { useAuth } from '../contexts/AuthContext'; // <-- Import useAuth to get currentUser
+
+// Import storage functions
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase'; // <-- Assuming you exported 'storage' from firebase.ts
 
 interface PostHomePageProps {
-    addHome: (home: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => Promise<void>; // addHome is now async
+    addHome: (home: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => Promise<void>;
 }
 
 const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { currentUser } = useAuth(); // <-- Get currentUser from AuthContext
+
     const [formData, setFormData] = useState({
         title: '',
         address: '',
-        rent: '', // Store as string for input, convert to number on submit
+        rent: '',
         propertyType: PropertyType.APARTMENT,
-        bedrooms: '1', // Store as string for select, convert to number
-        bathrooms: '1', // Store as string for select, convert to number
-        areaSqFt: '', // Optional, store as string
+        bedrooms: '1',
+        bathrooms: '1',
+        areaSqFt: '',
         description: '',
         foodPreference: FoodPreference.ANY,
         communityPreference: CommunityPreference.OPEN_TO_ALL,
         contact: '',
     });
     const [imageFiles, setImageFiles] = useState<File[]>([]);
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]); // Base64 strings for preview
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [errors, setErrors] = useState<Partial<Record<keyof typeof formData | 'images', string>>>({});
-    const [isSubmitting, setIsSubmitting] = useState(false); // New state for submission status
-    const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null); // For user feedback
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -44,18 +51,35 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         if (errors[name as keyof typeof errors]) {
             setErrors(prev => ({ ...prev, [name]: undefined }));
         }
-        setSubmitMessage(null); // Clear messages on input change
+        setSubmitMessage(null);
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
-            // Limit to 5 images if you want
-            // const newFiles = filesArray.slice(0, 5 - imageFiles.length);
-            // setImageFiles(prevFiles => [...prevFiles, ...newFiles]);
 
-            setImageFiles(prevFiles => [...prevFiles, ...filesArray]);
+            // Combine new files with existing ones
+            const currentFiles = [...imageFiles, ...filesArray];
 
+            // Validate total number of images (if you enforce a max limit like 5)
+            // if (currentFiles.length > 5) { // Example: If you want a max of 5 total
+            //     setErrors(prev => ({ ...prev, images: t('formErrorMaxImages', { count: 5 }) }));
+            //     // You might want to filter currentFiles to only include the first 5 or handle this differently
+            //     return;
+            // }
+
+            // Validate each new file for size
+            const largeFiles = filesArray.filter(file => file.size > 5 * 1024 * 1024); // 5MB limit
+            if (largeFiles.length > 0) {
+                const largeFileNames = largeFiles.map(file => file.name).join(', ');
+                setErrors(prev => ({ ...prev, images: t('formErrorImageSizeExceeded', { files: largeFileNames, size: '5MB' }) }));
+                return; // Stop processing if any file is too large
+            }
+
+            // Update image files state
+            setImageFiles(currentFiles);
+
+            // Generate previews for newly added files
             filesArray.forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = () => {
@@ -67,15 +91,18 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
             if (errors.images) {
                 setErrors(prev => ({ ...prev, images: undefined }));
             }
-            setSubmitMessage(null); // Clear messages on input change
+            setSubmitMessage(null);
         }
     };
 
     const handleRemoveImage = (indexToRemove: number) => {
         setImageFiles(prev => prev.filter((_, index) => index !== indexToRemove));
         setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
+        // Clear image error if enough images remain after removal
+        if (imageFiles.length - 1 >= 5 && errors.images) { // Check if removing one still leaves enough
+            setErrors(prev => ({ ...prev, images: undefined }));
+        }
     };
-
 
     const validateForm = () => {
         const newErrors: Partial<Record<keyof typeof formData | 'images', string>> = {};
@@ -85,9 +112,9 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         else if (isNaN(Number(formData.rent)) || Number(formData.rent) <= 0) newErrors.rent = t('formErrorPositiveNumber');
         if (!formData.description.trim()) newErrors.description = t('formErrorRequired');
         if (!formData.contact.trim()) newErrors.contact = t('formErrorRequired');
-        // Removed imageFiles.length < 5 validation for now, as we're not uploading to Storage yet.
-        // If you want to enforce a minimum number of images, re-enable this.
-        // if (imageFiles.length < 5) newErrors.images = t('formErrorMinImages'); 
+
+        // *** Image Validation for submission ***
+        if (imageFiles.length < 5) newErrors.images = t('formErrorMinImages', { count: 5 });
 
         if (formData.areaSqFt.trim() && (isNaN(Number(formData.areaSqFt)) || Number(formData.areaSqFt) < 0)) {
             newErrors.areaSqFt = t('formErrorNumber');
@@ -97,16 +124,38 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => { // Made async
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSubmitMessage(null); // Clear previous messages
+        setSubmitMessage(null);
         if (!validateForm()) {
             setSubmitMessage({ type: 'error', text: t('formErrorValidationFailed') });
             return;
         }
 
-        setIsSubmitting(true); // Set submitting state
+        if (!currentUser) {
+            setSubmitMessage({ type: 'error', text: t('formErrorAuthRequired') });
+            return;
+        }
+
+        setIsSubmitting(true);
+        const imageUrls: string[] = []; // Array to store download URLs
+
         try {
+            // 1. Upload images to Firebase Cloud Storage
+            for (const file of imageFiles) {
+                // Double-check file size before upload (client-side validation for safety)
+                if (file.size > 5 * 1024 * 1024) {
+                    throw new Error(t('formErrorImageSizeExceeded', { files: file.name, size: '5MB' }));
+                }
+
+                // Create a unique path for each image in storage
+                const storageRef = ref(storage, `home_images/${currentUser.uid}/${file.name}_${Date.now()}`);
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+                imageUrls.push(downloadURL);
+            }
+
+            // 2. Prepare home object with imageUrls (array of URLs)
             const newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'> = {
                 ...formData,
                 rent: parseInt(formData.rent, 10),
@@ -116,11 +165,16 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                 propertyType: formData.propertyType as PropertyType,
                 foodPreference: formData.foodPreference as FoodPreference,
                 communityPreference: formData.communityPreference as CommunityPreference,
-                imageUrls: imagePreviews, // Storing base64 for now, will update for Cloud Storage later
+                contact: formData.contact, // Ensure contact is passed
+                imageUrls: imageUrls, // Store the array of Cloud Storage URLs
+                // userId: currentUser.uid, // App.tsx adds this automatically
             };
-            await addHome(newHome); // Await the async addHome function
+
+            // 3. Call addHome (this will save to Firestore)
+            await addHome(newHome);
+
             setSubmitMessage({ type: 'success', text: t('formSuccessHomePosted') });
-            // Optionally clear form here:
+            // Clear form and navigate
             setFormData({
                 title: '', address: '', rent: '', propertyType: PropertyType.APARTMENT,
                 bedrooms: '1', bathrooms: '1', areaSqFt: '', description: '',
@@ -129,13 +183,12 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
             });
             setImageFiles([]);
             setImagePreviews([]);
-            // Navigate after a short delay
-            setTimeout(() => navigate('/homes'), 1500);
-        } catch (error) {
+            setTimeout(() => navigate('/homes'), 1500); // Redirect after success message
+        } catch (error: any) { // Catch the error to display it
             console.error("Failed to post home:", error);
-            setSubmitMessage({ type: 'error', text: t('formErrorHomePostFailed') });
+            setSubmitMessage({ type: 'error', text: error.message || t('formErrorHomePostFailed') });
         } finally {
-            setIsSubmitting(false); // Reset submitting state
+            setIsSubmitting(false);
         }
     };
 
@@ -207,6 +260,12 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                     </div>
 
                     <div>
+                        <label htmlFor="contact" className="block text-sm font-medium text-gray-700 mb-1">{t('formLabelContact')}</label>
+                        <Input type="text" name="contact" id="contact" value={formData.contact} onChange={handleChange} placeholder={t('formPlaceholderContact')} required aria-describedby="contact-error" />
+                        {errors.contact && <p id="contact-error" className="text-xs text-red-600 mt-1">{errors.contact}</p>}
+                    </div>
+
+                    <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">{t('formLabelImages')}</label>
                         <div className={`mt-2 flex justify-center px-6 pt-5 pb-6 border-2 ${errors.images ? 'border-red-500' : 'border-gray-300'} border-dashed rounded-md`}>
                             <div className="space-y-1 text-center">
@@ -218,6 +277,7 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                                     </label>
                                 </div>
                                 <p className="text-xs text-gray-500">{t('formImageTypeHint')}</p>
+                                <p className="text-xs text-gray-500">{t('formImageRequirements', { min: 5, max: '5MB' })}</p> {/* New translation key */}
                             </div>
                         </div>
                         {errors.images && <p id="images-error" className="text-xs text-red-600 mt-1">{errors.images}</p>}
@@ -238,13 +298,10 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                                 ))}
                             </div>
                         )}
-                    </div>
-
-
-                    <div>
-                        <label htmlFor="contact" className="block text-sm font-medium text-gray-700 mb-1">{t('formLabelContact')}</label>
-                        <Input type="text" name="contact" id="contact" value={formData.contact} onChange={handleChange} placeholder={t('formPlaceholderContact')} required aria-describedby="contact-error" />
-                        {errors.contact && <p id="contact-error" className="text-xs text-red-600 mt-1">{errors.contact}</p>}
+                        {/* Display count of selected images */}
+                        {imageFiles.length > 0 && (
+                            <p className="text-sm text-gray-600 mt-2">{t('formImagesSelected', { count: imageFiles.length })}</p>
+                        )}
                     </div>
 
                     <div className="pt-2">

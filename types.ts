@@ -60,20 +60,21 @@ export enum CommunityPreference {
 
 export interface Home {
     id: string;
-    title: string; // e.g., "2 BHK Apartment for Rent"
-    address: string;
-    rent: number; // Monthly rent in INR
-    propertyType: PropertyType;
-    bedrooms: number; // e.g., 1, 2, 3. Use 0 for room/studio.
-    bathrooms: number;
-    areaSqFt?: number;
+    title: string;
     description: string;
+    location: string;
+    price: number;
+    bedrooms: number;
+    bathrooms: number;
+    areaSqFt?: number; // Area can be optional, as per your form
+    postedDate: string;
+    userEmail: string;
+    userId: string;
+    imageUrls: string[]; // <-- ADD THIS LINE
+    contact: string; // Ensure contact is part of the type
+    propertyType: PropertyType; // Ensure these enums are imported/defined
     foodPreference: FoodPreference;
     communityPreference: CommunityPreference;
-    contact: string;
-    postedDate: string;
-    imageUrls?: string[];
-    userEmail: string;
 }
 
 export interface JobFilters {

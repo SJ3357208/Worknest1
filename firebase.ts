@@ -3,6 +3,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore"; // If you plan to use Cloud Firestore
+import { getStorage } from "firebase/storage";
 
 // Your Firebase configuration (replace with your actual values from the Firebase Console)
 const firebaseConfig = {
@@ -14,12 +15,9 @@ const firebaseConfig = {
   appId: "1:578966655707:web:4e3aa3680a4bfc066432fe"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app); 
 
-// Initialize Firebase services and export them for use throughout your app
-export const auth = getAuth(app);
-export const db = getFirestore(app); // Example for Cloud Firestore
-
-// You might also export the 'app' instance itself if needed, though often not directly
-// export { app };
+export { auth, db, storage }; 
