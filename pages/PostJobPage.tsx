@@ -1,14 +1,13 @@
-
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Job, JobType, JobCategory } from '../types';
 import { Button, Input, Select, Textarea, Card } from '../components/ui';
 import { POST_JOB_TYPE_OPTIONS, POST_JOB_CATEGORY_OPTIONS } from '../constants';
 import { useTranslation } from '../hooks/useTranslation';
+import { ExclamationTriangleIcon } from '../components/icons'; // Assuming this path for icons
 
 interface PostJobPageProps {
-    addJob: (job: Omit<Job, 'id' | 'postedDate' | 'userEmail'>) => void;
+    addJob: (job: Omit<Job, 'id' | 'postedDate' | 'userEmail'>) => Promise<void>; // addJob is now async
 }
 
 const PostJobPage: React.FC<PostJobPageProps> = ({ addJob }) => {
@@ -25,6 +24,8 @@ const PostJobPage: React.FC<PostJobPageProps> = ({ addJob }) => {
         contact: '',
     });
     const [errors, setErrors] = useState<Partial<typeof formData>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false); // New state for submission status
+    const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null); // For user feedback
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -32,6 +33,7 @@ const PostJobPage: React.FC<PostJobPageProps> = ({ addJob }) => {
         if (errors[name as keyof typeof errors]) {
             setErrors(prev => ({ ...prev, [name]: undefined }));
         }
+        setSubmitMessage(null); // Clear messages on input change
     };
 
     const validateForm = () => {
@@ -41,23 +43,41 @@ const PostJobPage: React.FC<PostJobPageProps> = ({ addJob }) => {
         if (!formData.location.trim()) newErrors.location = t('formErrorRequired');
         if (!formData.description.trim()) newErrors.description = t('formErrorRequired');
         if (!formData.contact.trim()) newErrors.contact = t('formErrorRequired');
-        // Type and Category will have default values from select, so usually don't need specific validation unless "select one" is an option
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => { // Made async
         e.preventDefault();
-        if (!validateForm()) return;
+        setSubmitMessage(null); // Clear previous messages
+        if (!validateForm()) {
+            setSubmitMessage({ type: 'error', text: t('formErrorValidationFailed') }); // Generic validation error message
+            return;
+        }
 
-        const newJob: Omit<Job, 'id' | 'postedDate' | 'userEmail'> = {
-            ...formData,
-            type: formData.type as JobType, // Ensure correct enum type
-            category: formData.category as JobCategory, // Ensure correct enum type
-        };
-        addJob(newJob);
-        alert(t('formSuccessJobPosted')); // Simple success message
-        navigate('/jobs');
+        setIsSubmitting(true); // Set submitting state
+        try {
+            const newJob: Omit<Job, 'id' | 'postedDate' | 'userEmail'> = {
+                ...formData,
+                type: formData.type as JobType,
+                category: formData.category as JobCategory,
+            };
+            await addJob(newJob); // Await the async addJob function
+            setSubmitMessage({ type: 'success', text: t('formSuccessJobPosted') });
+            // Optionally clear form here:
+            setFormData({
+                title: '', employer: '', location: '', type: JobType.FULL_TIME,
+                category: JobCategory.OTHER, description: '', salary: '', contact: '',
+            });
+            // Navigate after a short delay to allow message to be seen
+            setTimeout(() => navigate('/jobs'), 1500);
+        } catch (error) {
+            console.error("Failed to post job:", error);
+            setSubmitMessage({ type: 'error', text: t('formErrorJobPostFailed') }); // Specific error message
+        } finally {
+            setIsSubmitting(false); // Reset submitting state
+        }
     };
 
     return (
@@ -65,6 +85,12 @@ const PostJobPage: React.FC<PostJobPageProps> = ({ addJob }) => {
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-8 text-center">{t('postJobPageTitle')}</h1>
             <Card className="p-6 sm:p-8 bg-white shadow-xl">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {submitMessage && (
+                        <div className={`p-3 rounded-md flex items-start space-x-2 ${submitMessage.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                            <ExclamationTriangleIcon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${submitMessage.type === 'success' ? 'text-green-500' : 'text-red-500'}`} />
+                            <p className="text-sm">{submitMessage.text}</p>
+                        </div>
+                    )}
                     <div>
                         <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">{t('formLabelTitle')}</label>
                         <Input type="text" name="title" id="title" value={formData.title} onChange={handleChange} placeholder={t('formPlaceholderTitleJob')} required aria-describedby="title-error" />
@@ -105,8 +131,8 @@ const PostJobPage: React.FC<PostJobPageProps> = ({ addJob }) => {
                         {errors.contact && <p id="contact-error" className="text-xs text-red-600 mt-1">{errors.contact}</p>}
                     </div>
                     <div className="pt-2">
-                        <Button type="submit" variant="primary" size="lg" className="w-full">
-                            {t('formButtonPostJob')}
+                        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={isSubmitting}>
+                            {isSubmitting ? t('Loading...') : t('formButtonPostJob')}
                         </Button>
                     </div>
                 </form>

@@ -1,13 +1,10 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     Job, Home
 } from './types';
-import {
-    MOCK_JOBS, MOCK_HOMES, APP_NAME_KEY
-} from './constants';
+// Removed MOCK_JOBS, MOCK_HOMES as we'll use Firestore
+import { APP_NAME_KEY } from './constants';
 import { Button, LoadingSpinner } from './components/ui';
 import {
     BriefcaseIcon, HomeModernIcon, LanguageIcon, ChevronDownIcon, PlusIcon, UserCircleIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon
@@ -16,6 +13,10 @@ import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useTranslation } from './hooks/useTranslation';
 import { LanguageCode } from './translations';
+
+// Import Firestore functions and the 'db' instance
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, DocumentData } from 'firebase/firestore';
+import { db } from './firebase'; // Import the initialized Firestore instance
 
 // Import page components
 import LandingPage from './pages/LandingPage';
@@ -30,7 +31,7 @@ import JobDetailsPage from './pages/JobDetailsPage';
 import HomeDetailsPage from './pages/HomeDetailsPage';
 
 
-// Navbar Component
+// Navbar Component (No changes needed here for Firestore integration)
 const Navbar: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -231,7 +232,7 @@ const Navbar: React.FC = () => {
     );
 };
 
-// Footer Component
+// Footer Component (No changes needed here)
 const Footer: React.FC = () => {
     const { t } = useTranslation();
     return (
@@ -247,40 +248,123 @@ const Footer: React.FC = () => {
 
 // Main App Component structure
 const AppContent: React.FC = () => {
-    const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
-    const [homes, setHomes] = useState<Home[]>(MOCK_HOMES);
+    // State to hold jobs and homes fetched from Firestore
+    const [jobs, setJobs] = useState<Job[]>([]);
+    const [homes, setHomes] = useState<Home[]>([]);
     const { currentUser, isLoading: authLoading } = useAuth();
 
+    // --- Firestore Data Fetching (Jobs) ---
+    useEffect(() => {
+        const q = query(collection(db, 'jobs'), orderBy('postedDate', 'desc')); // Order by date, newest first
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const jobsData: Job[] = snapshot.docs.map(doc => ({
+                id: doc.id, // Firestore document ID
+                postedDate: doc.data().postedDate, // Ensure this is a string in YYYY-MM-DD format in Firestore
+                userEmail: doc.data().userEmail,
+                ...doc.data()
+            } as Job)); // Cast to Job type
+            setJobs(jobsData);
+        }, (error) => {
+            console.error("Error fetching jobs: ", error);
+            // Optionally handle error state here
+        });
 
-    const addJob = (newJob: Omit<Job, 'id' | 'postedDate' | 'userEmail'>) => {
-        if (!currentUser) return; // Should be protected by ProtectedRoute, but good practice
-        const jobWithDetails: Job = {
-            ...newJob,
-            id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            postedDate: new Date().toISOString().split('T')[0],
-            userEmail: currentUser.email,
-        };
-        setJobs(prevJobs => [jobWithDetails, ...prevJobs]);
-    };
+        // Cleanup subscription on component unmount
+        return () => unsubscribe();
+    }, []); // Empty dependency array means this runs once on mount
 
-    const addHome = (newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => {
-        if (!currentUser) return;
-        const homeWithDetails: Home = {
-            ...newHome,
-            id: `home-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            postedDate: new Date().toISOString().split('T')[0],
-            userEmail: currentUser.email,
-        };
-        setHomes(prevHomes => [homeWithDetails, ...prevHomes]);
-    };
+    // --- Firestore Data Fetching (Homes) ---
+    useEffect(() => {
+        const q = query(collection(db, 'homes'), orderBy('postedDate', 'desc')); // Order by date, newest first
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const homesData: Home[] = snapshot.docs.map(doc => ({
+                id: doc.id, // Firestore document ID
+                postedDate: doc.data().postedDate, // Ensure this is a string in YYYY-MM-DD format in Firestore
+                userEmail: doc.data().userEmail,
+                ...doc.data()
+            } as Home)); // Cast to Home type
+            setHomes(homesData);
+        }, (error) => {
+            console.error("Error fetching homes: ", error);
+            // Optionally handle error state here
+        });
 
-    const deleteJob = (jobId: string) => {
-        setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-    };
+        // Cleanup subscription on component unmount
+        return () => unsubscribe();
+    }, []); // Empty dependency array means this runs once on mount
 
-    const deleteHome = (homeId: string) => {
-        setHomes(prevHomes => prevHomes.filter(home => home.id !== homeId));
-    };
+
+    // --- Firestore Add Functions ---
+    const addJob = useCallback(async (newJob: Omit<Job, 'id' | 'postedDate' | 'userEmail'>) => {
+        if (!currentUser) {
+            console.error("No user logged in to post a job.");
+            return;
+        }
+        try {
+            const jobToAdd = {
+                ...newJob,
+                postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+                userEmail: currentUser.email,
+                userId: currentUser.uid, // Store user UID for security rules and ownership checks
+            };
+            await addDoc(collection(db, 'jobs'), jobToAdd);
+            console.log("Job added successfully to Firestore!");
+        } catch (e) {
+            console.error("Error adding job to Firestore: ", e);
+        }
+    }, [currentUser]); // Recreate if currentUser changes
+
+    const addHome = useCallback(async (newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => {
+        if (!currentUser) {
+            console.error("No user logged in to post a home.");
+            return;
+        }
+        try {
+            const homeToAdd = {
+                ...newHome,
+                postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+                userEmail: currentUser.email,
+                userId: currentUser.uid, // Store user UID for security rules and ownership checks
+            };
+            await addDoc(collection(db, 'homes'), homeToAdd);
+            console.log("Home added successfully to Firestore!");
+        } catch (e) {
+            console.error("Error adding home to Firestore: ", e);
+        }
+    }, [currentUser]); // Recreate if currentUser changes
+
+    // --- Firestore Delete Functions ---
+    const deleteJob = useCallback(async (jobId: string) => {
+        if (!currentUser) {
+            console.error("No user logged in to delete a job.");
+            return;
+        }
+        try {
+            // Before deleting, you might want to add a check to ensure the currentUser.uid matches the job's userId
+            // This will be enforced by Firestore Security Rules later, but a client-side check is good too.
+            const jobRef = doc(db, 'jobs', jobId);
+            await deleteDoc(jobRef);
+            console.log(`Job with ID ${jobId} deleted successfully from Firestore!`);
+        } catch (e) {
+            console.error("Error deleting job from Firestore: ", e);
+        }
+    }, [currentUser]);
+
+    const deleteHome = useCallback(async (homeId: string) => {
+        if (!currentUser) {
+            console.error("No user logged in to delete a home.");
+            return;
+        }
+        try {
+            // Similar to jobs, consider adding a client-side ownership check
+            const homeRef = doc(db, 'homes', homeId);
+            await deleteDoc(homeRef);
+            console.log(`Home with ID ${homeId} deleted successfully from Firestore!`);
+        } catch (e) {
+            console.error("Error deleting home from Firestore: ", e);
+        }
+    }, [currentUser]);
+
 
     const LocationWatcher = () => {
         const location = useLocation();
@@ -291,8 +375,6 @@ const AppContent: React.FC = () => {
     };
 
     if (authLoading && !sessionStorage.getItem('auth_checked_once')) {
-        // Show a full-page loader only on the very first load if auth is still resolving
-        // This helps prevent layout shifts or brief flashes of non-auth content
         return (
             <div className="flex flex-col min-h-screen justify-center items-center bg-gray-50">
                 <LoadingSpinner />
@@ -309,9 +391,12 @@ const AppContent: React.FC = () => {
                 <LocationWatcher />
                 <Routes>
                     <Route path="/" element={<LandingPage />} />
+                    {/* Pass jobs and homes fetched from Firestore */}
                     <Route path="/jobs" element={<JobSearchPage jobs={jobs} />} />
+                    {/* JobDetailsPage will now find the job from the 'jobs' array passed down */}
                     <Route path="/jobs/:id" element={<JobDetailsPage jobs={jobs} deleteJob={deleteJob} />} />
                     <Route path="/homes" element={<HomeSearchPage homes={homes} />} />
+                    {/* HomeDetailsPage will now find the home from the 'homes' array passed down */}
                     <Route path="/homes/:id" element={<HomeDetailsPage homes={homes} deleteHome={deleteHome} />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
@@ -320,6 +405,7 @@ const AppContent: React.FC = () => {
                         path="/post-job"
                         element={
                             <ProtectedRoute>
+                                {/* Pass the new addJob function */}
                                 <PostJobPage addJob={addJob} />
                             </ProtectedRoute>
                         }
@@ -328,6 +414,7 @@ const AppContent: React.FC = () => {
                         path="/post-home"
                         element={
                             <ProtectedRoute>
+                                {/* Pass the new addHome function */}
                                 <PostHomePage addHome={addHome} />
                             </ProtectedRoute>
                         }

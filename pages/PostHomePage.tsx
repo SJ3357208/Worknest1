@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, PropertyType, FoodPreference, CommunityPreference } from '../types';
@@ -12,10 +10,10 @@ import {
     POST_BATHROOM_OPTIONS
 } from '../constants';
 import { useTranslation } from '../hooks/useTranslation';
-import { CloudArrowUpIcon, XCircleIcon } from '../components/icons';
+import { CloudArrowUpIcon, XCircleIcon, ExclamationTriangleIcon } from '../components/icons'; // Assuming this path for icons
 
 interface PostHomePageProps {
-    addHome: (home: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => void;
+    addHome: (home: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => Promise<void>; // addHome is now async
 }
 
 const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
@@ -35,8 +33,10 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         contact: '',
     });
     const [imageFiles, setImageFiles] = useState<File[]>([]);
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]); // Base64 strings for preview
     const [errors, setErrors] = useState<Partial<Record<keyof typeof formData | 'images', string>>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false); // New state for submission status
+    const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null); // For user feedback
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -44,11 +44,16 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         if (errors[name as keyof typeof errors]) {
             setErrors(prev => ({ ...prev, [name]: undefined }));
         }
+        setSubmitMessage(null); // Clear messages on input change
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
+            // Limit to 5 images if you want
+            // const newFiles = filesArray.slice(0, 5 - imageFiles.length);
+            // setImageFiles(prevFiles => [...prevFiles, ...newFiles]);
+
             setImageFiles(prevFiles => [...prevFiles, ...filesArray]);
 
             filesArray.forEach(file => {
@@ -62,6 +67,7 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
             if (errors.images) {
                 setErrors(prev => ({ ...prev, images: undefined }));
             }
+            setSubmitMessage(null); // Clear messages on input change
         }
     };
 
@@ -79,7 +85,9 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         else if (isNaN(Number(formData.rent)) || Number(formData.rent) <= 0) newErrors.rent = t('formErrorPositiveNumber');
         if (!formData.description.trim()) newErrors.description = t('formErrorRequired');
         if (!formData.contact.trim()) newErrors.contact = t('formErrorRequired');
-        if (imageFiles.length < 5) newErrors.images = t('formErrorMinImages');
+        // Removed imageFiles.length < 5 validation for now, as we're not uploading to Storage yet.
+        // If you want to enforce a minimum number of images, re-enable this.
+        // if (imageFiles.length < 5) newErrors.images = t('formErrorMinImages'); 
 
         if (formData.areaSqFt.trim() && (isNaN(Number(formData.areaSqFt)) || Number(formData.areaSqFt) < 0)) {
             newErrors.areaSqFt = t('formErrorNumber');
@@ -89,24 +97,46 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => { // Made async
         e.preventDefault();
-        if (!validateForm()) return;
+        setSubmitMessage(null); // Clear previous messages
+        if (!validateForm()) {
+            setSubmitMessage({ type: 'error', text: t('formErrorValidationFailed') });
+            return;
+        }
 
-        const newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'> = {
-            ...formData,
-            rent: parseInt(formData.rent, 10),
-            bedrooms: parseInt(formData.bedrooms, 10),
-            bathrooms: parseInt(formData.bathrooms, 10),
-            areaSqFt: formData.areaSqFt ? parseInt(formData.areaSqFt, 10) : undefined,
-            propertyType: formData.propertyType as PropertyType,
-            foodPreference: formData.foodPreference as FoodPreference,
-            communityPreference: formData.communityPreference as CommunityPreference,
-            imageUrls: imagePreviews,
-        };
-        addHome(newHome);
-        alert(t('formSuccessHomePosted'));
-        navigate('/homes');
+        setIsSubmitting(true); // Set submitting state
+        try {
+            const newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'> = {
+                ...formData,
+                rent: parseInt(formData.rent, 10),
+                bedrooms: parseInt(formData.bedrooms, 10),
+                bathrooms: parseInt(formData.bathrooms, 10),
+                areaSqFt: formData.areaSqFt ? parseInt(formData.areaSqFt, 10) : undefined,
+                propertyType: formData.propertyType as PropertyType,
+                foodPreference: formData.foodPreference as FoodPreference,
+                communityPreference: formData.communityPreference as CommunityPreference,
+                imageUrls: imagePreviews, // Storing base64 for now, will update for Cloud Storage later
+            };
+            await addHome(newHome); // Await the async addHome function
+            setSubmitMessage({ type: 'success', text: t('formSuccessHomePosted') });
+            // Optionally clear form here:
+            setFormData({
+                title: '', address: '', rent: '', propertyType: PropertyType.APARTMENT,
+                bedrooms: '1', bathrooms: '1', areaSqFt: '', description: '',
+                foodPreference: FoodPreference.ANY, communityPreference: CommunityPreference.OPEN_TO_ALL,
+                contact: '',
+            });
+            setImageFiles([]);
+            setImagePreviews([]);
+            // Navigate after a short delay
+            setTimeout(() => navigate('/homes'), 1500);
+        } catch (error) {
+            console.error("Failed to post home:", error);
+            setSubmitMessage({ type: 'error', text: t('formErrorHomePostFailed') });
+        } finally {
+            setIsSubmitting(false); // Reset submitting state
+        }
     };
 
     return (
@@ -114,6 +144,12 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-8 text-center">{t('postHomePageTitle')}</h1>
             <Card className="p-6 sm:p-8 bg-white shadow-xl">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {submitMessage && (
+                        <div className={`p-3 rounded-md flex items-start space-x-2 ${submitMessage.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                            <ExclamationTriangleIcon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${submitMessage.type === 'success' ? 'text-green-500' : 'text-red-500'}`} />
+                            <p className="text-sm">{submitMessage.text}</p>
+                        </div>
+                    )}
                     <div>
                         <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">{t('formLabelTitle')}</label>
                         <Input type="text" name="title" id="title" value={formData.title} onChange={handleChange} placeholder={t('formPlaceholderTitleHome')} required aria-describedby="title-error" />
@@ -212,8 +248,8 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                     </div>
 
                     <div className="pt-2">
-                        <Button type="submit" variant="primary" size="lg" className="w-full">
-                            {t('formButtonPostHome')}
+                        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={isSubmitting}>
+                            {isSubmitting ? t('Loading...') : t('formButtonPostHome')}
                         </Button>
                     </div>
                 </form>
