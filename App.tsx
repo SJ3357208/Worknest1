@@ -261,15 +261,15 @@ const AppContent: React.FC = () => {
                 const data = doc.data();
                 let postedDateString: string;
 
-                // Check if the postedDate is a Firestore Timestamp
+                // Robust date parsing logic
                 if (data.postedDate instanceof Timestamp) {
-                    // If it's a Timestamp, convert it to a simple date string
                     postedDateString = data.postedDate.toDate().toISOString().split('T')[0];
+                } else if (data.postedDate && typeof data.postedDate === 'object' && 'timestampValue' in data.postedDate) {
+                    // This handles the raw JSON format from Firestore's onSnapshot
+                    postedDateString = new Date(data.postedDate.timestampValue).toISOString().split('T')[0];
                 } else if (typeof data.postedDate === 'string') {
-                    // If it's already a string, use it directly
                     postedDateString = data.postedDate;
                 } else {
-                    // Fallback for any other unexpected format
                     postedDateString = 'Unknown Date';
                 }
 
@@ -298,15 +298,15 @@ const AppContent: React.FC = () => {
                 const data = doc.data();
                 let postedDateString: string;
 
-                // Check if the postedDate is a Firestore Timestamp
+                // Robust date parsing logic
                 if (data.postedDate instanceof Timestamp) {
-                    // If it's a Timestamp, convert it to a simple date string
                     postedDateString = data.postedDate.toDate().toISOString().split('T')[0];
+                } else if (data.postedDate && typeof data.postedDate === 'object' && 'timestampValue' in data.postedDate) {
+                    // This handles the raw JSON format from Firestore's onSnapshot
+                    postedDateString = new Date(data.postedDate.timestampValue).toISOString().split('T')[0];
                 } else if (typeof data.postedDate === 'string') {
-                    // If it's already a string, use it directly
                     postedDateString = data.postedDate;
                 } else {
-                    // Fallback for any other unexpected format
                     postedDateString = 'Unknown Date';
                 }
 
