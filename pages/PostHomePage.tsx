@@ -11,11 +11,11 @@ import {
 } from '../constants';
 import { useTranslation } from '../hooks/useTranslation';
 import { CloudArrowUpIcon, XCircleIcon, ExclamationTriangleIcon } from '../components/icons';
-import { useAuth } from '../contexts/AuthContext'; // <-- Import useAuth to get currentUser
+import { useAuth } from '../contexts/AuthContext';
 
 // Import storage functions
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase'; // <-- Assuming you exported 'storage' from firebase.ts
+import { storage } from '../firebase';
 
 interface PostHomePageProps {
     addHome: (home: Omit<Home, 'id' | 'postedDate' | 'userEmail'>) => Promise<void>;
@@ -24,7 +24,7 @@ interface PostHomePageProps {
 const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { currentUser } = useAuth(); // <-- Get currentUser from AuthContext
+    const { currentUser } = useAuth();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -33,7 +33,7 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         propertyType: PropertyType.APARTMENT,
         bedrooms: '1',
         bathrooms: '1',
-        areaSqFt: '',
+        areaSqFt: '', // Store as string for input
         description: '',
         foodPreference: FoodPreference.ANY,
         communityPreference: CommunityPreference.OPEN_TO_ALL,
@@ -58,28 +58,17 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
 
-            // Combine new files with existing ones
             const currentFiles = [...imageFiles, ...filesArray];
 
-            // Validate total number of images (if you enforce a max limit like 5)
-            // if (currentFiles.length > 5) { // Example: If you want a max of 5 total
-            //     setErrors(prev => ({ ...prev, images: t('formErrorMaxImages', { count: 5 }) }));
-            //     // You might want to filter currentFiles to only include the first 5 or handle this differently
-            //     return;
-            // }
-
-            // Validate each new file for size
             const largeFiles = filesArray.filter(file => file.size > 5 * 1024 * 1024); // 5MB limit
             if (largeFiles.length > 0) {
                 const largeFileNames = largeFiles.map(file => file.name).join(', ');
                 setErrors(prev => ({ ...prev, images: t('formErrorImageSizeExceeded', { files: largeFileNames, size: '5MB' }) }));
-                return; // Stop processing if any file is too large
+                return;
             }
 
-            // Update image files state
             setImageFiles(currentFiles);
 
-            // Generate previews for newly added files
             filesArray.forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = () => {
@@ -98,8 +87,7 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
     const handleRemoveImage = (indexToRemove: number) => {
         setImageFiles(prev => prev.filter((_, index) => index !== indexToRemove));
         setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
-        // Clear image error if enough images remain after removal
-        if (imageFiles.length - 1 >= 5 && errors.images) { // Check if removing one still leaves enough
+        if (imageFiles.length - 1 >= 5 && errors.images) {
             setErrors(prev => ({ ...prev, images: undefined }));
         }
     };
@@ -113,9 +101,9 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         if (!formData.description.trim()) newErrors.description = t('formErrorRequired');
         if (!formData.contact.trim()) newErrors.contact = t('formErrorRequired');
 
-        // *** Image Validation for submission ***
         if (imageFiles.length < 5) newErrors.images = t('formErrorMinImages', { count: 5 });
 
+        // Validation for areaSqFt when it's provided (it's optional, so only validate if not empty)
         if (formData.areaSqFt.trim() && (isNaN(Number(formData.areaSqFt)) || Number(formData.areaSqFt) < 0)) {
             newErrors.areaSqFt = t('formErrorNumber');
         }
@@ -138,43 +126,37 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
         }
 
         setIsSubmitting(true);
-        const imageUrls: string[] = []; // Array to store download URLs
+        const imageUrls: string[] = [];
 
         try {
-            // 1. Upload images to Firebase Cloud Storage
             for (const file of imageFiles) {
-                // Double-check file size before upload (client-side validation for safety)
                 if (file.size > 5 * 1024 * 1024) {
                     throw new Error(t('formErrorImageSizeExceeded', { files: file.name, size: '5MB' }));
                 }
 
-                // Create a unique path for each image in storage
                 const storageRef = ref(storage, `home_images/${currentUser.uid}/${file.name}_${Date.now()}`);
                 await uploadBytes(storageRef, file);
                 const downloadURL = await getDownloadURL(storageRef);
                 imageUrls.push(downloadURL);
             }
 
-            // 2. Prepare home object with imageUrls (array of URLs)
             const newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'> = {
                 ...formData,
                 rent: parseInt(formData.rent, 10),
                 bedrooms: parseInt(formData.bedrooms, 10),
                 bathrooms: parseInt(formData.bathrooms, 10),
-                areaSqFt: formData.areaSqFt ? parseInt(formData.areaSqFt, 10) : undefined,
+                // Fix: Store null if areaSqFt is empty or just whitespace, instead of undefined
+                areaSqFt: formData.areaSqFt.trim() !== '' ? parseInt(formData.areaSqFt, 10) : null,
                 propertyType: formData.propertyType as PropertyType,
                 foodPreference: formData.foodPreference as FoodPreference,
                 communityPreference: formData.communityPreference as CommunityPreference,
-                contact: formData.contact, // Ensure contact is passed
-                imageUrls: imageUrls, // Store the array of Cloud Storage URLs
-                // userId: currentUser.uid, // App.tsx adds this automatically
+                contact: formData.contact,
+                imageUrls: imageUrls,
             };
 
-            // 3. Call addHome (this will save to Firestore)
             await addHome(newHome);
 
             setSubmitMessage({ type: 'success', text: t('formSuccessHomePosted') });
-            // Clear form and navigate
             setFormData({
                 title: '', address: '', rent: '', propertyType: PropertyType.APARTMENT,
                 bedrooms: '1', bathrooms: '1', areaSqFt: '', description: '',
@@ -183,8 +165,8 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
             });
             setImageFiles([]);
             setImagePreviews([]);
-            setTimeout(() => navigate('/homes'), 1500); // Redirect after success message
-        } catch (error: any) { // Catch the error to display it
+            setTimeout(() => navigate('/homes'), 1500);
+        } catch (error: any) {
             console.error("Failed to post home:", error);
             setSubmitMessage({ type: 'error', text: error.message || t('formErrorHomePostFailed') });
         } finally {
@@ -277,7 +259,7 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                                     </label>
                                 </div>
                                 <p className="text-xs text-gray-500">{t('formImageTypeHint')}</p>
-                                <p className="text-xs text-gray-500">{t('formImageRequirements', { min: 5, max: '5MB' })}</p> {/* New translation key */}
+                                <p className="text-xs text-gray-500">{t('formImageRequirements', { min: 5, max: '5MB' })}</p>
                             </div>
                         </div>
                         {errors.images && <p id="images-error" className="text-xs text-red-600 mt-1">{errors.images}</p>}
@@ -298,7 +280,6 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                                 ))}
                             </div>
                         )}
-                        {/* Display count of selected images */}
                         {imageFiles.length > 0 && (
                             <p className="text-sm text-gray-600 mt-2">{t('formImagesSelected', { count: imageFiles.length })}</p>
                         )}

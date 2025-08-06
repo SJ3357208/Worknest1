@@ -257,13 +257,29 @@ const AppContent: React.FC = () => {
     useEffect(() => {
         const q = query(collection(db, 'jobs'), orderBy('postedDate', 'desc')); // Order by date, newest first
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const jobsData: Job[] = snapshot.docs.map(doc => ({
-                id: doc.id, // Firestore document ID
-                // Convert Firestore Timestamp to string for consistent type if needed later, or use Timestamp directly
-                postedDate: (doc.data().postedDate instanceof Timestamp) ? doc.data().postedDate.toDate().toISOString().split('T')[0] : doc.data().postedDate,
-                userEmail: doc.data().userEmail,
-                ...doc.data()
-            } as Job)); // Cast to Job type
+            const jobsData: Job[] = snapshot.docs.map(doc => {
+                const data = doc.data();
+                let postedDateString: string;
+
+                // Check if the postedDate is a Firestore Timestamp
+                if (data.postedDate instanceof Timestamp) {
+                    // If it's a Timestamp, convert it to a simple date string
+                    postedDateString = data.postedDate.toDate().toISOString().split('T')[0];
+                } else if (typeof data.postedDate === 'string') {
+                    // If it's already a string, use it directly
+                    postedDateString = data.postedDate;
+                } else {
+                    // Fallback for any other unexpected format
+                    postedDateString = 'Unknown Date';
+                }
+
+                return {
+                    id: doc.id, // Firestore document ID
+                    postedDate: postedDateString,
+                    userEmail: data.userEmail,
+                    ...data
+                } as Job;
+            });
             setJobs(jobsData);
         }, (error) => {
             console.error("Error fetching jobs: ", error);
@@ -278,13 +294,29 @@ const AppContent: React.FC = () => {
     useEffect(() => {
         const q = query(collection(db, 'homes'), orderBy('postedDate', 'desc')); // Order by date, newest first
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const homesData: Home[] = snapshot.docs.map(doc => ({
-                id: doc.id, // Firestore document ID
-                // Convert Firestore Timestamp to string for consistent type if needed later, or use Timestamp directly
-                postedDate: (doc.data().postedDate instanceof Timestamp) ? doc.data().postedDate.toDate().toISOString().split('T')[0] : doc.data().postedDate,
-                userEmail: doc.data().userEmail,
-                ...doc.data()
-            } as Home)); // Cast to Home type
+            const homesData: Home[] = snapshot.docs.map(doc => {
+                const data = doc.data();
+                let postedDateString: string;
+
+                // Check if the postedDate is a Firestore Timestamp
+                if (data.postedDate instanceof Timestamp) {
+                    // If it's a Timestamp, convert it to a simple date string
+                    postedDateString = data.postedDate.toDate().toISOString().split('T')[0];
+                } else if (typeof data.postedDate === 'string') {
+                    // If it's already a string, use it directly
+                    postedDateString = data.postedDate;
+                } else {
+                    // Fallback for any other unexpected format
+                    postedDateString = 'Unknown Date';
+                }
+
+                return {
+                    id: doc.id, // Firestore document ID
+                    postedDate: postedDateString,
+                    userEmail: data.userEmail,
+                    ...data
+                } as Home;
+            });
             setHomes(homesData);
         }, (error) => {
             console.error("Error fetching homes: ", error);
