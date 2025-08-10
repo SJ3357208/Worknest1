@@ -84,7 +84,9 @@ const JobDetailsPage: React.FC<JobDetailsPageProps> = ({ jobs, deleteJob }) => {
                             <p className="flex items-start"><MapPinIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {job.location}</p>
                             <p className="flex items-start"><BriefcaseIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t(JOB_TYPE_OPTIONS.find(opt => opt.value === job.type)?.labelKey || job.type)}</p>
                             <p className="flex items-start"><TagIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t(JOB_CATEGORY_OPTIONS.find(opt => opt.value === job.category)?.labelKey || job.category)}</p>
-                            <p className="flex items-start"><CalendarDaysIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t('jobCardPosted')}: {new Date(job.postedDate).toLocaleDateString()}</p>
+                            <p className="flex items-start"><CalendarDaysIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t('jobCardPosted')}: {{job.postedDate?.toDate 
+    ? job.postedDate.toDate().toLocaleDateString() 
+    : "No date"}}</p>
                         </div>
                     </Card>
 
