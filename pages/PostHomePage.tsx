@@ -140,20 +140,20 @@ const PostHomePage: React.FC<PostHomePageProps> = ({ addHome }) => {
                 imageUrls.push(downloadURL);
             }
 
-            const newHome: Omit<Home, 'id' | 'postedDate' | 'userEmail'> = {
+            const newHome: Omit<Home, 'id'> = {
                 ...formData,
-                rent: parseInt(formData.rent, 10),
-                bedrooms: parseInt(formData.bedrooms, 10),
-                bathrooms: parseInt(formData.bathrooms, 10),
-                // Fix: Store null if areaSqFt is empty or just whitespace, instead of undefined
-                areaSqFt: formData.areaSqFt.trim() !== '' ? parseInt(formData.areaSqFt, 10) : null,
-                propertyType: formData.propertyType as PropertyType,
-                foodPreference: formData.foodPreference as FoodPreference,
-                communityPreference: formData.communityPreference as CommunityPreference,
-                contact: formData.contact,
-                imageUrls: imageUrls,
+              rent: parseInt(formData.rent, 10),
+             bedrooms: parseInt(formData.bedrooms, 10),
+             bathrooms: parseInt(formData.bathrooms, 10),
+             areaSqFt: formData.areaSqFt.trim() !== '' ? parseInt(formData.areaSqFt, 10) : null,
+             propertyType: formData.propertyType as PropertyType,
+             foodPreference: formData.foodPreference as FoodPreference,
+             communityPreference: formData.communityPreference as CommunityPreference,
+             contact: formData.contact,
+             imageUrls,
+             postedDate: new Date().toISOString(),
+             userEmail: currentUser.email || ""
             };
-
             await addHome(newHome);
 
             setSubmitMessage({ type: 'success', text: t('formSuccessHomePosted') });
