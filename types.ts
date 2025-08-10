@@ -1,4 +1,4 @@
-
+import { Timestamp } from "firebase/firestore"
 
 export enum JobType {
     FULL_TIME = 'Full-time',
