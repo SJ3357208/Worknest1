@@ -147,7 +147,9 @@ const HomeDetailsPage: React.FC<HomeDetailsPageProps> = ({ homes, deleteHome }) 
                             </p>
                             <p className="flex items-start"><HeartIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t('homeCardFoodPrefix')}: {t(FOOD_PREFERENCE_OPTIONS.find(opt => opt.value === home.foodPreference)?.labelKey || home.foodPreference)}</p>
                             <p className="flex items-start"><UserGroupIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t('homeCardCommunityPrefix')}: {t(COMMUNITY_PREFERENCE_OPTIONS.find(opt => opt.value === home.communityPreference)?.labelKey || home.communityPreference)}</p>
-                            <p className="flex items-start"><CalendarDaysIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t('jobCardPosted')}: {new Date(home.postedDate).toLocaleDateString()}</p>
+                            <p className="flex items-start"><CalendarDaysIcon className="w-5 h-5 mr-3 text-emerald-600 flex-shrink-0 mt-0.5" /> {t('jobCardPosted')}: {home.postedDate?.toDate 
+    ? home.postedDate.toDate().toLocaleDateString() 
+    : "No date"}</p>
                         </div>
                     </Card>
 
