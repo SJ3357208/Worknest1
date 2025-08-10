@@ -262,7 +262,7 @@ const AppContent: React.FC = () => {
                 let postedDateString: string;
 
                 // Robust date parsing logic
-                if (data.postedDate && data.postedDate.toDate) {
+                if (data.postedDate instanceof Timestamp) {
                     postedDateString = data.postedDate.toDate().toISOString().split('T')[0];
                 } else if (data.postedDate && typeof data.postedDate === 'object' && 'timestampValue' in data.postedDate) {
                     // This handles the raw JSON format from Firestore's onSnapshot
