@@ -107,9 +107,9 @@ const JobSearchPage: React.FC<JobSearchPageProps> = ({ jobs: initialJobs }) => {
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-                  <p className="text-xs text-gray-500 flex items-center"><CalendarDaysIcon className="w-4 h-4 mr-1"/> {t('jobCardPosted')}: {{job.postedDate?.toDate 
-    ? job.postedDate.toDate().toLocaleDateString() 
-    : "No date"}}</p>
+                  <p className="text-xs text-gray-500 flex items-center"><CalendarDaysIcon className="w-4 h-4 mr-1"/> {t('jobCardPosted')}: {job.postedDate?.toDate 
+  ? job.postedDate.toDate().toLocaleDateString() 
+  : new Date(job.postedDate).toLocaleDateString()}</p>
                   <Button size="sm" variant="outline" onClick={() => handleViewDetails(job.id)}>{t('jobCardViewDetails')}</Button>
                 </div>
               </Card>
