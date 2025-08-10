@@ -67,7 +67,7 @@ export interface Home {
     bedrooms: number;
     bathrooms: number;
     areaSqFt?: number; // Area can be optional, as per your form
-    postedDate: new Date().toISOString();
+    postedDate: string | Timestamp;
     userEmail: string;
     userId: string;
     imageUrls: string[]; // <-- ADD THIS LINE
