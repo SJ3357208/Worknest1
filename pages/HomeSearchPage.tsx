@@ -146,7 +146,9 @@ const HomeSearchPage: React.FC<HomeSearchPageProps> = ({ homes: initialHomes }) 
                                     </div>
                                 </div>
                                 <div className="bg-gray-50 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-                                    <p className="text-xs text-gray-500 flex items-center"><CalendarDaysIcon className="w-4 h-4 mr-1" /> {t('homeCardPosted')}: {new Date(home.postedDate).toLocaleDateString()}</p>
+                                    <p className="text-xs text-gray-500 flex items-center"><CalendarDaysIcon className="w-4 h-4 mr-1" /> {t('homeCardPosted')}: {home.postedDate
+  ? new Date(home.postedDate).toLocaleDateString()
+  : "No date available"}</p>
                                     <Button size="sm" variant="outline" onClick={() => handleViewDetails(home.id)}>{t('jobCardViewDetails')}</Button>
                                 </div>
                             </Card>
